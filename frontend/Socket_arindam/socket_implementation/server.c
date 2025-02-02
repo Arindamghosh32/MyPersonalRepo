@@ -20,6 +20,7 @@
 #define BUFFER_SIZE 1024
 #define MAX_CLIENTS 10
 #define DATABASE_PATH "./data/"
+#define MAX_TABLE_NAME 256
 
 /* Structure to hold client information */
 typedef struct {
@@ -212,6 +213,37 @@ void create_database(int client_socket, char *db_name) {
             send(client_socket, "Error: Could not create database\n", 32, 0);
         }
     }
+}
+
+/* Create a new table */
+void create_table(int client_socket, char *command, char *current_db) {
+    if (strlen(current_db) == 0) {
+        send(client_socket, "Error: No database selected\n", 27, 0);
+        return;
+    }
+
+    char *token = strtok(NULL, " \n");
+    if (!token) {
+        send(client_socket, "Error: Table name required\n", 26, 0);
+        return;
+    }
+
+    char table_name[MAX_TABLE_NAME];
+    strncpy(table_name, token, MAX_TABLE_NAME - 1);
+    table_name[MAX_TABLE_NAME - 1] = '\0';
+
+    /* Create table file */
+    char path[512];
+    snprintf(path, sizeof(path), "%s%s/%s.tbl", DATABASE_PATH, current_db, table_name);
+    
+    FILE *fp = fopen(path, "w");
+    if (!fp) {
+        send(client_socket, "Error: Could not create table\n", 29, 0);
+        return;
+    }
+    fclose(fp);
+
+    send(client_socket, "Table created successfully\n", 26, 0);
 }
 
 /* Clean up server resources */
