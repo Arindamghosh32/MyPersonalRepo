@@ -52,48 +52,61 @@ void handle_signal(int sig) {
 }
 
 int main(void) {
-    /* Initialize signal handlers */
-    signal(SIGINT, handle_signal);
-    signal(SIGTERM, handle_signal);
 
-    /* Initialize server */
-    initialize_server();
 
-    /* Create data directory if it doesn't exist */
-    mkdir(DATABASE_PATH, 0777);
 
-    printf("Server is running on port %d...\n", PORT);
+     return start_socket_server(PORT, handle_client_connection);
 
-    /* Main server loop */
-    while (1) {
-        struct sockaddr_in client_addr;
-        socklen_t client_len = sizeof(client_addr);
 
-        /* Accept new client connection */
-        int client_socket = accept(server_socket, (struct sockaddr *)&client_addr, &client_len);
-        if (client_socket < 0) {
-            perror("Accept failed");
-            continue;
-        }
 
-        printf("New client connected from %s:%d\n", 
-               inet_ntoa(client_addr.sin_addr), 
-               ntohs(client_addr.sin_port));
+    // /* Initialize signal handlers */
+    // signal(SIGINT, handle_signal);
+    // signal(SIGTERM, handle_signal);
 
-        /* Handle client in a new process */
-        pid_t pid = fork();
-        if (pid == 0) {
-            /* Child process */
-            close(server_socket);
-            handle_client_connection(client_socket, client_addr);
-            exit(0);
-        } else {
-            /* Parent process */
-            close(client_socket);
-        }
-    }
+    // /* Initialize server */
+    // initialize_server();
 
-    return 0;
+    // /* Create data directory if it doesn't exist */
+    // mkdir(DATABASE_PATH, 0777);
+
+    // printf("Server is running on port %d...\n", PORT);
+
+    // /* Main server loop */
+    // while (1) {
+    //     struct sockaddr_in client_addr;
+    //     socklen_t client_len = sizeof(client_addr);
+
+    //     /* Accept new client connection */
+    //     int client_socket = accept(server_socket, (struct sockaddr *)&client_addr, &client_len);
+    //     if (client_socket < 0) {
+    //         perror("Accept failed");
+    //         continue;
+    //     }
+
+    //     printf("New client connected from %s:%d\n", 
+    //            inet_ntoa(client_addr.sin_addr), 
+    //            ntohs(client_addr.sin_port));
+
+    //     /* Handle client in a new process */
+    //     pid_t pid = fork();
+    //     if (pid == 0) {
+    //         /* Child process */
+    //         close(server_socket);
+    //         handle_client_connection(client_socket, client_addr);
+    //         exit(0);
+    //     } else {
+    //         /* Parent process */
+    //         close(client_socket);
+    //     }
+    // }
+
+    // return 0;
+
+
+
+
+
+
 }
 
 /* Initialize the server socket and bind to port */
@@ -193,7 +206,7 @@ void process_command(int client_socket, char *command) {
             create_table(client_socket, command, clients[client_socket].current_database);
         }
     }
-    /* Add other commands here */
+    /* Add other future commands here */
 }
 
 /* Create a new database */
@@ -250,3 +263,83 @@ void create_table(int client_socket, char *command, char *current_db) {
 void cleanup_server(void) {
     close(server_socket);
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//here i have created this function which will help me to start the socket as a function which i can incorporate in main file or as a command and i dont neeed to stat the 
+//socket file as a seperate process
+int start_socket_server(int port,void(*client_handler)(int,struct sockaddr_in)){
+    //This is the function where which will help me to create a function
+
+    signal(SIGINT,handle_signal);
+    signal(SIGTERM,handle_signal);
+
+    server_socket = socket(AF_INET, SOCK_STREAM, 0);
+    if(server_socket < 0){
+        perror("Socket creation failed");
+        return -1;
+    }
+    
+    //configure server address
+    struct sockaddr_in server_addr;
+    memset(&server_addr, 0, sizeof(server_addr));
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(port);
+    server_addr.sin_addr.s_addr = INADDR_ANY;
+
+    //bind the server address
+    if(bind(server_socket,(struct sockaddr *)&server_addr,sizeof(server_addr)) < 0){
+        perror("Binding failed");
+        close(server_socket);
+        return -1;
+    }
+
+    //listen for incoming connections
+    if(listen(server_socket,10) < 0){
+        perror("Listen failed");
+        close(server_socket);
+        return -1;
+    }
+
+    //creating data directory if it doesnt exist
+
+    mkdir(DATABASE_PATH,0777);
+    printf("Server is running on port %d...\n",port);
+
+    //server loop
+
+    while(1){
+        struct sockaddr_in client_addr;
+        socklen_t client_len = sizeof(client_addr);
+
+        int client_socket = accept(server_socket,(struct sockaddr *)&client_addr, &client_len);
+
+        if(client_socket < 0){
+            perror("Accept failed");
+            continue;
+        }
+
+        //handle the client in a new process
+        pid_t pid = fork();
+        if (pid == 0){
+            close(server_socket);
+            client_handler(client_socket, client_addr);
+            exit(0);
+        } else {
+            close(client_socket);
+        }
+        
+    }
+}
+//it ends here
