@@ -3,10 +3,10 @@ CFLAGS = -Wall
 
 all: server client
 
-server: server.client
+server: server.c
 	$(CC) $(CFLAGS) server.c -o server
 
-client: server.client
+client: client.c
 	$(CC) $(CFLAGS) client.c -o client
 
 run_server: server

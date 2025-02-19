@@ -26,12 +26,57 @@ void initialize_client(void);
 void handle_user_input(void);
 void cleanup_client(void);
 void handle_signal(int sig);
+int start_socket_client(const char *ip_address, int port, void (*signal_handler)(int));
 
 /* Signal handler for graceful shutdown */
 void handle_signal(int sig) {
     printf("\nDisconnecting from server...\n");
     cleanup_client();
     exit(0);
+}
+
+/* Function to start and run the socket client */
+int start_socket_client(const char *ip_address, int port, void (*signal_handler)(int)) {
+    /* Store server IP */
+    strncpy(server_ip, ip_address, sizeof(server_ip) - 1);
+    server_ip[sizeof(server_ip) - 1] = '\0';
+
+    /* Initialize signal handlers */
+    signal(SIGINT, signal_handler);
+    signal(SIGTERM, signal_handler);
+
+    struct sockaddr_in server_addr;
+
+    /* Create socket */
+    client_socket = socket(AF_INET, SOCK_STREAM, 0);
+    if (client_socket < 0) {
+        perror("Socket creation failed");
+        return -1;
+    }
+
+    /* Configure server address */
+    memset(&server_addr, 0, sizeof(server_addr));
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(port);
+    
+    /* Convert IP address from string to binary form */
+    if (inet_pton(AF_INET, ip_address, &server_addr.sin_addr) <= 0) {
+        perror("Invalid server IP address");
+        return -1;
+    }
+
+    /* Connect to server */
+    if (connect(client_socket, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+        perror("Connection failed");
+        return -1;
+    }
+
+    printf("Connected to server at %s:%d\n", ip_address, port);
+
+    /* Handle user input */
+    handle_user_input();
+
+    return 0;
 }
 
 int main(int argc, char *argv[]) {
@@ -42,60 +87,15 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    /* Store server IP */
-    strncpy(server_ip, argv[1], sizeof(server_ip) - 1);
-    server_ip[sizeof(server_ip) - 1] = '\0';
-
-    /* Initialize signal handlers */
-    signal(SIGINT, handle_signal);
-    signal(SIGTERM, handle_signal);
-
-    /* Initialize client */
-    initialize_client();
-
-    /* Handle user input */
-    handle_user_input();
-
-    return 0;
+    return start_socket_client(argv[1], SERVER_PORT, handle_signal);
 }
 
-/* Initialize client connection to server */
-void initialize_client(void) {
-    struct sockaddr_in server_addr;
-
-    /* Create socket */
-    client_socket = socket(AF_INET, SOCK_STREAM, 0);
-    if (client_socket < 0) {
-        perror("Socket creation failed");
-        exit(1);
-    }
-
-    /* Configure server address */
-    memset(&server_addr, 0, sizeof(server_addr));
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(SERVER_PORT);
-    
-    /* Convert IP address from string to binary form */
-    if (inet_pton(AF_INET, server_ip, &server_addr.sin_addr) <= 0) {
-        perror("Invalid server IP address");
-        exit(1);
-    }
-
-    /* Connect to server */
-    if (connect(client_socket, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
-        perror("Connection failed");
-        exit(1);
-    }
-
-    printf("Connected to server at %s:%d\n", server_ip, SERVER_PORT);
-}
-
-/* Handle user input and server responses */
+// Handle user input and server responses 
 void handle_user_input(void) {
     char command[MAX_COMMAND_LENGTH];
     char buffer[BUFFER_SIZE];
     
-    /* Receive welcome message */
+     //Receive welcome message 
     memset(buffer, 0, BUFFER_SIZE);
     recv(client_socket, buffer, BUFFER_SIZE-1, 0);
     printf("%s", buffer);
